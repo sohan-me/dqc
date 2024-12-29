@@ -1,0 +1,73 @@
+services:
+  backend:
+    container_name: backend
+    build:
+      context: ./
+    volumes:
+      - ./:/quote_companion
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+  db:
+    image: postgres:alpine
+    container_name: quote_db
+    restart: on-failure
+    environment:
+      POSTGRES_USER: quote_db
+      POSTGRES_PASSWORD: noob_db
+      POSTGRES_DB: quote_db
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  celery-generate:
+    container_name: celery_generate
+    build:
+      context: ./
+    command: celery --app=core worker -l INFO -Q queue1
+    volumes:
+      - ./:/quote_companion
+    depends_on:
+      - redis
+    environment:
+      - TZ=Asia/Dhaka
+
+  celery-deliver:
+    container_name: celery_deliver
+    build:
+      context: ./
+    command: celery --app=core worker -l INFO -Q queue2
+    volumes:
+      - ./:/quote_companion
+    depends_on:
+      - redis
+    environment:
+      - TZ=Asia/Dhaka
+
+  redis:
+    container_name: redis
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  celery-beat:
+    container_name: celerybeat
+    build:
+      context: ./
+    command: celery --app=core beat -l INFO 
+    volumes:
+      - ./:/cs_uk
+      - celery-beat-schedule:/celerybeat-schedule
+    depends_on:
+      - redis
+      - backend
+    environment:
+      - TZ=Asia/Dhaka
+
+volumes:
+  db_data:
+  celery-beat-schedule:
+    driver: local  
